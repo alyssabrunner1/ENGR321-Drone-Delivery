@@ -1,7 +1,7 @@
-# - Drone Delivery Prototype
+# Drone Delivery Dashboard
 
-A working front-end prototype of an autonomous drone delivery app, built for a human factors
-engineering course. It demonstrates the full customer journey — **order placement → address &
+A working front-end prototype of an autonomous drone delivery app, built with
+human factors ideals in mind. It demonstrates the full customer journey — **order placement → address &
 drop-zone selection → pre-flight safety checks → live tracking → delivery confirmation** — as a
 mobile-first web app that installs like a native app from a phone's home screen.
 
