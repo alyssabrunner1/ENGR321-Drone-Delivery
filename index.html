@@ -1,0 +1,1387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Waypoint</title>
+<meta name="description" content="A human-factors prototype for an autonomous drone delivery operation serving rural properties outside Bozeman, Montana, presented as a live operations dashboard.">
+<meta name="theme-color" content="#eef0e8">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* Deliberate single committed light "report canvas" world (BI-tool convention),
+     not a light/dark toggle — every color still declared explicitly. */
+  :root {
+    color-scheme: light;
+    --page: #eef0e8;
+    --surface: #faf9f4;
+    --surface-sunken: #e7e8dd;
+    --border: #dbddd0;
+    --border-strong: #c5c8b7;
+    --text-primary: #1f2921;
+    --text-secondary: #5b6a5a;
+    --text-muted: #8a9587;
+
+    --accent: #0f7a9c;
+    --accent-strong: #0b5c78;
+    --accent-dim: #dcebee;
+
+    --zone: #b8447f;
+    --zone-dim: #f6e6ee;
+
+    --good: #347e46;
+    --good-dim: #e5eee1;
+    --warning: #c78f1e;
+    --warning-dim: #f7ecd3;
+    --warning-text: #6b4d10;
+    --critical: #b04a34;
+    --critical-dim: #f5e3dc;
+
+    --shadow-sm: 0 1px 2px rgba(31,41,33,.05);
+    --shadow-md: 0 6px 20px rgba(31,41,33,.09);
+    --shadow-lg: 0 20px 48px rgba(31,41,33,.20);
+
+    --font-headline: 'Fraunces', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+    --font-display: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    --sidebar-w: 68px;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: var(--font-display);
+  }
+
+  .shell { display: flex; min-height: 100vh; }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar {
+    width: var(--sidebar-w);
+    flex-shrink: 0;
+    background: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 16px 0;
+    position: sticky; top: 0; height: 100vh;
+  }
+  .sidebar .logo {
+    width: 34px; height: 34px; border-radius: 9px;
+    background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 18px;
+  }
+  .sidebar .logo svg { width: 18px; height: 18px; }
+  .nav-btn {
+    width: 44px; height: 44px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 10px;
+    background: transparent;
+    border: none;
+    color: rgba(234,240,255,.55);
+    cursor: pointer;
+    position: relative;
+  }
+  .nav-btn svg { width: 20px; height: 20px; }
+  .nav-btn:hover { color: #eaf0ff; background: rgba(255,255,255,.08); }
+  .nav-btn.is-active { color: #fff; background: var(--accent); }
+  .nav-btn .nav-tip {
+    position: absolute; left: 54px; top: 50%; transform: translateY(-50%);
+    background: var(--text-primary); color: #fff;
+    font-size: .72rem; font-weight: 600; white-space: nowrap;
+    padding: 5px 9px; border-radius: 6px;
+    opacity: 0; pointer-events: none; transition: opacity .1s;
+    box-shadow: var(--shadow-md);
+    z-index: 40;
+  }
+  .nav-btn:hover .nav-tip { opacity: 1; }
+
+  /* ---------- Main column ---------- */
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+  .topbar {
+    padding: 18px 28px 14px;
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+    background: var(--page);
+  }
+  .topbar h1 { margin: 0; font-family: var(--font-headline); font-size: 1.5rem; font-weight: 600; letter-spacing: -.01em; }
+  .topbar .subtitle { margin-top: 2px; font-size: .82rem; color: var(--text-muted); }
+  .filter-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .filter-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--surface); border: 1px solid var(--border-strong);
+    border-radius: 8px; padding: 7px 11px; font-size: .78rem; font-weight: 600;
+    color: var(--text-secondary); cursor: pointer;
+  }
+  .filter-chip:hover { border-color: var(--accent); color: var(--text-primary); }
+  .filter-chip select { border: none; background: transparent; font: inherit; color: inherit; cursor: pointer; }
+  .filter-chip select:focus-visible { outline: none; }
+
+  .canvas-area { flex: 1; padding: 20px 28px 40px; }
+  .page { display: none; flex-direction: column; gap: 18px; }
+  .page.is-active { display: flex; }
+
+  /* ---------- Tile grid ---------- */
+  .tile-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; align-items: stretch; }
+  .tile {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px;
+    display: flex; flex-direction: column;
+    min-width: 0;
+  }
+  .span-3 { grid-column: span 3; }
+  .span-4 { grid-column: span 4; }
+  .span-6 { grid-column: span 6; }
+  .span-8 { grid-column: span 8; }
+  .span-12 { grid-column: span 12; }
+  @media (max-width: 980px) {
+    .span-3 { grid-column: span 6; }
+    .span-4, .span-6, .span-8 { grid-column: span 12; }
+  }
+  @media (max-width: 620px) {
+    .span-3 { grid-column: span 12; }
+    :root { --sidebar-w: 56px; }
+    .canvas-area { padding: 16px 14px 32px; }
+    .topbar { padding: 14px 16px 12px; }
+  }
+
+  .tile-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+  .tile-title { font-family: var(--font-mono); font-size: .7rem; font-weight: 500; text-transform: uppercase; letter-spacing: .09em; color: var(--text-muted); }
+  .tile-menu { color: var(--text-muted); font-size: 1rem; line-height: 1; }
+
+  /* KPI tiles */
+  .kpi-value { font-family: var(--font-mono); font-size: 1.7rem; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .kpi-delta { font-size: .76rem; font-weight: 700; margin-top: 4px; display: inline-flex; align-items: center; gap: 4px; }
+  .kpi-delta.is-good { color: var(--good); }
+  .kpi-delta.is-bad { color: var(--critical); }
+  .kpi-delta.is-flat { color: var(--text-muted); }
+
+  /* Charts */
+  .chart-wrap { position: relative; flex: 1; min-height: 150px; }
+  .chart-wrap canvas { width: 100%; height: 100%; display: block; }
+  .legend-row { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; font-size: .74rem; color: var(--text-secondary); }
+  .legend-row span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend-row i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+
+  /* Table */
+  table.data-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+  table.data-table th {
+    text-align: left; font-size: .68rem; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--text-muted); font-weight: 700; padding: 0 10px 8px; border-bottom: 1px solid var(--border);
+  }
+  table.data-table td { padding: 10px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  table.data-table tbody tr:last-child td { border-bottom: none; }
+  table.data-table tbody tr:hover { background: var(--surface-sunken); }
+  .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+  .table-scroll { overflow-x: auto; }
+
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 9px; border-radius: 999px; font-size: .72rem; font-weight: 700;
+  }
+  .status-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .status-pill.st-delivered { background: var(--good-dim); color: var(--good); }
+  .status-pill.st-transit, .status-pill.st-dispatched, .status-pill.st-arriving { background: var(--accent-dim); color: var(--accent-strong); }
+  .status-pill.st-preparing { background: var(--surface-sunken); color: var(--text-secondary); }
+  .status-pill.st-delayed { background: var(--warning-dim); color: var(--warning-text); }
+
+  /* ---------- Forms (New Delivery page) ---------- */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 820px) { .form-grid { grid-template-columns: 1fr; } }
+
+  .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+  .field label { font-size: .8rem; color: var(--text-secondary); font-weight: 600; }
+  .field input[type="text"], .field input[type="number"], .field select {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-family: var(--font-display);
+    font-size: .9rem;
+    padding: 10px 11px;
+  }
+  .field input:focus-visible, .field select:focus-visible, button:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  .field-error { display: none; font-size: .78rem; color: var(--critical); }
+  .field.has-error input { border-color: var(--critical); }
+  .field.has-error .field-error { display: block; }
+
+  .chip-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip {
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text-secondary);
+    border-radius: 999px;
+    padding: 7px 13px;
+    font-size: .78rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--text-primary); }
+  .chip.is-selected { background: var(--accent-dim); border-color: var(--accent); color: var(--accent-strong); }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    padding: 11px 18px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: .86rem;
+    cursor: pointer;
+    transition: background-color .15s ease, opacity .15s ease, border-color .15s;
+  }
+  .btn:disabled { cursor: not-allowed; opacity: .4; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:not(:disabled):hover { background: var(--accent-strong); }
+  .btn-good { background: var(--good); color: #fff; }
+  .btn-good:not(:disabled):hover { background: #0b7a51; }
+  .btn-ghost { background: var(--surface); border-color: var(--border-strong); color: var(--text-secondary); }
+  .btn-ghost:hover { color: var(--text-primary); border-color: var(--accent); }
+  .btn-block { width: 100%; }
+
+  .limit-row { display: flex; justify-content: space-between; font-size: .78rem; color: var(--text-secondary); margin-bottom: 4px; }
+  .limit-track { height: 6px; border-radius: 3px; background: var(--surface-sunken); overflow: hidden; }
+  .limit-fill { height: 100%; background: var(--accent); transition: width .2s ease, background-color .2s ease; }
+  .limit-fill.is-warning { background: var(--warning); }
+  .limit-fill.is-critical { background: var(--critical); }
+
+  .map-wrap { position: relative; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--surface-sunken); aspect-ratio: 16/10; }
+  .map-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; display: block; }
+  .map-caption { position: absolute; left: 0; right: 0; bottom: 0; padding: 7px 10px; background: linear-gradient(0deg, rgba(255,255,255,.94), rgba(255,255,255,0)); font-family: var(--font-mono); font-size: .68rem; color: var(--text-secondary); pointer-events: none; }
+  .zone-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: .74rem; color: var(--text-muted); margin-top: 8px; }
+  .zone-legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .zone-legend i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+
+  .banner { display: flex; gap: 9px; padding: 11px 13px; border-radius: 9px; font-size: .82rem; line-height: 1.45; margin-top: 10px; }
+  .banner.is-critical { background: var(--critical-dim); color: #8a2323; border: 1px solid #f0c2c2; }
+  .banner.is-warning { background: var(--warning-dim); color: var(--warning-text); border: 1px solid #f0d9ad; }
+  .banner strong { display: block; margin-bottom: 2px; }
+
+  .flight-check { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
+  .flight-check .status-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; background: var(--good); }
+  .flight-check.is-blocked .status-dot { background: var(--critical); }
+  .flight-check .fc-label { font-size: .85rem; font-weight: 700; }
+  .flight-check .fc-detail { font-size: .76rem; color: var(--text-muted); }
+
+  .demo-toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px dashed var(--border-strong); border-radius: 9px; background: var(--surface-sunken); font-size: .78rem; color: var(--text-secondary); margin-top: 10px; }
+  .switch { position: relative; width: 38px; height: 22px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; position: absolute; z-index: 1; }
+  .switch .track { position: absolute; inset: 0; background: var(--border-strong); border-radius: 999px; transition: background-color .15s; }
+  .switch .thumb { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .15s; }
+  .switch input:checked + .track { background: var(--critical); }
+  .switch input:checked + .track + .thumb { transform: translateX(16px); }
+
+  .method-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  @media (max-width: 620px) { .method-grid { grid-template-columns: 1fr 1fr; } }
+  .method-card { display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--border-strong); background: var(--surface); border-radius: 10px; padding: 12px; text-align: left; cursor: pointer; color: var(--text-primary); font-family: var(--font-display); }
+  .method-card svg { width: 18px; height: 18px; color: var(--text-secondary); }
+  .method-card .m-name { font-size: .82rem; font-weight: 700; margin-top: 4px; }
+  .method-card .m-desc { font-size: .70rem; color: var(--text-muted); line-height: 1.35; }
+  .method-card.is-selected { border-color: var(--accent); background: var(--accent-dim); }
+  .method-card.is-selected svg { color: var(--accent-strong); }
+
+  .summary-row { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; font-size: .84rem; }
+  .summary-row + .summary-row { border-top: 1px solid var(--border); }
+  .summary-row .k { color: var(--text-secondary); }
+  .summary-row .v { font-weight: 700; text-align: right; }
+
+  /* Fleet map page */
+  .timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+  .timeline li { position: relative; display: flex; gap: 11px; align-items: flex-start; padding: 8px 0 8px 2px; font-size: .84rem; color: var(--text-muted); }
+  .timeline li::before { content: ""; position: absolute; left: 9px; top: -2px; width: 2px; height: calc(100% + 4px); background: var(--border); z-index: 0; }
+  .timeline li:first-child::before { top: 50%; height: calc(50% + 4px); }
+  .timeline li:last-child::before { height: calc(50% + 2px); }
+  .t-node { position: relative; z-index: 1; width: 20px; height: 20px; border-radius: 50%; background: var(--surface); border: 2px solid var(--border-strong); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: .6rem; }
+  .timeline li.is-complete { color: var(--text-secondary); }
+  .timeline li.is-complete .t-node { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .timeline li.is-active { color: var(--text-primary); font-weight: 700; }
+  .timeline li.is-active .t-node { background: var(--accent); border-color: var(--accent-strong); box-shadow: 0 0 0 4px var(--accent-dim); color: #fff; }
+  .t-time { margin-left: auto; font-family: var(--font-mono); font-size: .7rem; color: var(--text-muted); flex-shrink: 0; }
+
+  .log-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; }
+  .log-list li { display: flex; gap: 9px; align-items: baseline; font-size: .78rem; }
+  .log-dot { width: 7px; height: 7px; border-radius: 50%; margin-top: 2px; background: var(--text-muted); flex-shrink: 0; }
+  .log-list li.sev-success .log-dot { background: var(--good); }
+  .log-list li.sev-notice .log-dot { background: var(--zone); }
+  .log-list li.sev-critical .log-dot { background: var(--critical); }
+  .log-time { font-family: var(--font-mono); color: var(--text-muted); flex-shrink: 0; }
+  .log-msg { color: var(--text-secondary); }
+
+  .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 30px 10px; color: var(--text-muted); font-size: .84rem; text-align: center; flex: 1; }
+
+  /* ---------- Toasts & modal ---------- */
+  .toast-stack { position: fixed; top: 16px; right: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 80; max-width: min(320px, calc(100vw - 32px)); }
+  .toast { display: flex; align-items: center; gap: 9px; padding: 10px 14px; border-radius: 9px; background: var(--text-primary); color: #fff; box-shadow: var(--shadow-lg); font-size: .82rem; animation: toast-in .2s ease-out; }
+  .toast .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--accent); }
+  .toast.sev-success .dot { background: #34d399; }
+  .toast.sev-critical .dot { background: #f87171; }
+  .toast.is-leaving { animation: toast-out .25s ease-in forwards; }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes toast-out { to { opacity: 0; transform: translateX(10px); } }
+  @media (prefers-reduced-motion: reduce) { .toast { animation: none; } .toast.is-leaving { animation: none; opacity: 0; } }
+
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(16,22,40,.5); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 90; }
+  .modal-card { background: var(--surface); border-radius: 10px; box-shadow: var(--shadow-lg); padding: 22px; width: 100%; max-width: 380px; max-height: 90vh; overflow-y: auto; }
+  .modal-card h2 { margin: 0 0 4px; font-family: var(--font-headline); font-weight: 600; font-size: 1.25rem; }
+  .modal-card p.lede { margin: 0 0 16px; color: var(--text-secondary); font-size: .84rem; }
+
+  .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+  .keypad button { padding: 14px 0; border-radius: 9px; border: 1px solid var(--border-strong); background: var(--surface-sunken); color: var(--text-primary); font-family: var(--font-mono); font-size: 1.05rem; cursor: pointer; }
+  .keypad button:hover { border-color: var(--accent); }
+  .pin-boxes { display: flex; gap: 9px; justify-content: center; }
+  .pin-box { width: 42px; height: 50px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface-sunken); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 1.25rem; font-weight: 700; }
+  .pin-box.is-filled { border-color: var(--accent); color: var(--accent-strong); }
+  .pin-box.is-error { border-color: var(--critical); }
+  .qr-block { display: flex; justify-content: center; padding: 6px; }
+  #sigCanvas { width: 100%; height: 140px; background: var(--surface-sunken); border: 1px dashed var(--border-strong); border-radius: 9px; touch-action: none; }
+  #photoPreview { width: 100%; border-radius: 9px; display: none; border: 1px solid var(--border-strong); margin-bottom: 10px; }
+
+  .about-note { font-size: .74rem; color: var(--text-muted); line-height: 1.55; }
+
+  ::selection { background: var(--accent-dim); color: var(--text-primary); }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="toast-stack" id="toastStack" aria-live="polite"></div>
+
+  <nav class="sidebar" aria-label="Primary">
+    <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3v18M3 12h18" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="12" r="3.2" fill="#fff"/></svg></div>
+    <button class="nav-btn is-active" data-page="overview" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="3.5" width="7" height="7" rx="1.4"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.4"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.4"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.4"/></svg>
+      <span class="nav-tip">Overview</span>
+    </button>
+    <button class="nav-btn" data-page="new" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v8M8 12h8" stroke-linecap="round"/></svg>
+      <span class="nav-tip">New Delivery</span>
+    </button>
+    <button class="nav-btn" data-page="fleet" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12l7-8 3 3.2L20 3l1 1-4.2 7L20 15l-1 1-4.3-3.6L11.5 16 13 21l-1.4 1.2-3.4-5.6L4 15.3 3 14l4-2.6L3 12z"/></svg>
+      <span class="nav-tip">Fleet Map</span>
+    </button>
+    <button class="nav-btn" data-page="orders" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="4" width="17" height="16" rx="1.6"/><path d="M7 9h10M7 13h10M7 17h6" stroke-linecap="round"/></svg>
+      <span class="nav-tip">Orders</span>
+    </button>
+  </nav>
+
+  <div class="main">
+    <header class="topbar">
+      <div>
+        <h1 id="pageTitle">Delivery Operations</h1>
+        <div class="subtitle" id="pageSubtitle">Four Corners Hub · Serving ranches and rural routes outside Bozeman, MT</div>
+      </div>
+      <div class="filter-row" id="topFilterRow">
+        <span class="filter-chip">📅 <select id="filterRange"><option>Today</option><option>Last 7 days</option><option>Last 30 days</option></select></span>
+        <span class="filter-chip">📍 <select id="filterZone"><option>All zones</option><option>Bridger Canyon</option><option>Springhill</option><option>Gallatin Gateway</option></select></span>
+        <span class="filter-chip">◎ <select id="filterStatus"><option>All statuses</option><option>Delivered</option><option>In Transit</option><option>Delayed</option></select></span>
+      </div>
+    </header>
+
+    <div class="canvas-area">
+
+      <!-- ============ OVERVIEW ============ -->
+      <section class="page is-active" data-page="overview">
+        <div class="tile-grid">
+          <div class="tile span-3">
+            <div class="tile-head"><span class="tile-title">Active Deliveries</span></div>
+            <div class="kpi-value" id="kpiActive">0</div>
+            <div class="kpi-delta is-flat" id="kpiActiveDelta">No drones airborne</div>
+          </div>
+          <div class="tile span-3">
+            <div class="tile-head"><span class="tile-title">On-Time Rate</span></div>
+            <div class="kpi-value">96.4%</div>
+            <div class="kpi-delta is-good">▲ 1.2 pts vs last week</div>
+          </div>
+          <div class="tile span-3">
+            <div class="tile-head"><span class="tile-title">Avg. Delivery Time</span></div>
+            <div class="kpi-value">18 min</div>
+            <div class="kpi-delta is-good">▼ 2 min faster</div>
+          </div>
+          <div class="tile span-3">
+            <div class="tile-head"><span class="tile-title">Deliveries Today</span></div>
+            <div class="kpi-value" id="kpiToday">6</div>
+            <div class="kpi-delta is-good">▲ 4 vs yesterday</div>
+          </div>
+
+          <div class="tile span-6">
+            <div class="tile-head"><span class="tile-title">Deliveries by Hour · Today</span><span class="tile-menu">⋯</span></div>
+            <div class="chart-wrap"><canvas id="barChart"></canvas></div>
+          </div>
+          <div class="tile span-6">
+            <div class="tile-head"><span class="tile-title">Delivery Status Breakdown</span><span class="tile-menu">⋯</span></div>
+            <div class="chart-wrap" style="min-height:130px;"><canvas id="donutChart"></canvas></div>
+            <div class="legend-row" id="donutLegend"></div>
+          </div>
+
+          <div class="tile span-6">
+            <div class="tile-head"><span class="tile-title">Wind Speed · Last 6 Hours</span><span class="tile-menu">⋯</span></div>
+            <div class="chart-wrap"><canvas id="windChart"></canvas></div>
+          </div>
+          <div class="tile span-6">
+            <div class="tile-head"><span class="tile-title">Fleet Map</span><span class="tile-menu">⋯</span></div>
+            <div class="map-wrap" id="ovMapWrap" style="aspect-ratio:auto; flex:1; min-height:150px;">
+              <canvas id="ovMapCanvas"></canvas>
+              <div class="map-caption" id="ovMapCaption">No active flights</div>
+            </div>
+          </div>
+
+          <div class="tile span-12">
+            <div class="tile-head"><span class="tile-title">Recent Orders</span><span class="tile-menu">⋯</span></div>
+            <div class="table-scroll">
+              <table class="data-table">
+                <thead><tr><th>Order</th><th>Address</th><th>Package</th><th>Confirm via</th><th>Status</th><th>ETA / Delivered</th></tr></thead>
+                <tbody id="overviewOrdersBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ NEW DELIVERY ============ -->
+      <section class="page" data-page="new">
+        <div class="form-grid">
+          <div class="tile">
+            <div class="tile-head"><span class="tile-title">1 · Drop Zone</span></div>
+            <p class="about-note" style="margin-bottom:10px;">Enter the delivery address, then confirm the exact hover-drop point.</p>
+            <div class="field" id="addressField">
+              <label for="addressInput">Delivery address</label>
+              <input id="addressInput" type="text" placeholder="e.g. 4415 Jackson Creek Rd" autocomplete="off">
+              <span class="field-error">Enter an address so we can locate a drop zone.</span>
+            </div>
+            <div class="chip-row" id="addressChips" style="margin-bottom:12px;"></div>
+
+            <div class="map-wrap" id="mapWrap">
+              <canvas id="mapCanvas"></canvas>
+              <div class="map-caption" id="mapCaption">Tap a spot inside the green safe zone</div>
+            </div>
+            <div class="zone-legend">
+              <span><i style="background:var(--good)"></i>Safe landing zone</span>
+              <span><i style="background:var(--zone)"></i>No-fly zone</span>
+              <span><i style="background:var(--accent)"></i>Drop point</span>
+            </div>
+            <div class="banner is-critical" id="zoneError" style="display:none;">
+              <span>⚠</span>
+              <div><strong id="zoneErrorTitle">That point is inside a no-fly zone</strong><span id="zoneErrorDetail"></span></div>
+            </div>
+          </div>
+
+          <div class="tile">
+            <div class="tile-head"><span class="tile-title">2 · Package</span></div>
+            <p class="about-note" style="margin-bottom:10px;">Kestrel-X2 drones carry up to <strong>5 lb</strong> and <strong>18 × 14 × 8 in</strong> per flight, with extended-range batteries rated for rural routes up to <strong>8 mi</strong> from the hub.</p>
+            <div class="chip-row" id="categoryChips" style="margin-bottom:12px;"></div>
+            <div class="field">
+              <label for="weightInput">Weight (lb)</label>
+              <input id="weightInput" type="number" min="0" max="12" step="0.1" value="1.5">
+            </div>
+            <div class="limit-row"><span>Payload used</span><span id="limitPct">30%</span></div>
+            <div class="limit-track"><div class="limit-fill" id="limitFill" style="width:30%"></div></div>
+            <div class="banner is-critical" id="weightError" style="display:none;">
+              <span>⚠</span>
+              <div><strong>Over the drone's payload limit</strong><span>This exceeds 5 lb. Try our standard ground courier for heavier items.</span></div>
+            </div>
+
+            <div class="tile-head" style="margin-top:16px;"><span class="tile-title">3 · Confirm delivery with</span></div>
+            <div class="method-grid" id="methodGrid"></div>
+          </div>
+
+          <div class="tile" style="grid-column: 1 / -1;">
+            <div class="tile-head"><span class="tile-title">4 · Review &amp; Flight Check</span></div>
+            <div class="form-grid" style="align-items:start;">
+              <div>
+                <div class="summary-row"><span class="k">Delivery address</span><span class="v" id="sumAddress">—</span></div>
+                <div class="summary-row"><span class="k">Package</span><span class="v" id="sumPackage">—</span></div>
+                <div class="summary-row"><span class="k">Confirm via</span><span class="v" id="sumMethod">—</span></div>
+                <div class="summary-row"><span class="k">Distance</span><span class="v" id="sumDistance">—</span></div>
+                <div class="summary-row"><span class="k">Estimated arrival</span><span class="v" id="sumEta">—</span></div>
+                <div class="summary-row"><span class="k">Delivery fee</span><span class="v" id="sumFee">—</span></div>
+              </div>
+              <div>
+                <div class="flight-check" id="fcWeather">
+                  <span class="status-dot"></span>
+                  <div><div class="fc-label" id="fcWeatherLabel">Wind 10 mph — within limits</div><div class="fc-detail">Safe launch threshold: 20 mph</div></div>
+                </div>
+                <div class="flight-check">
+                  <span class="status-dot"></span>
+                  <div><div class="fc-label">Airspace clear — Class G</div><div class="fc-detail">Verified during drop-zone selection</div></div>
+                </div>
+                <div class="demo-toggle">
+                  <span>Simulate high-wind delay (demo)</span>
+                  <label class="switch"><input type="checkbox" id="windToggle"><span class="track"></span><span class="thumb"></span></label>
+                </div>
+                <div class="banner is-critical" id="windBanner" style="display:none;">
+                  <span>⚠</span>
+                  <div><strong>Launch delayed for safety</strong><span id="windBannerDetail">Winds currently exceed the 20 mph safe-flight threshold. We'll notify you the moment it's clear.</span></div>
+                </div>
+              </div>
+            </div>
+            <div style="margin-top:16px; display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+              <button class="btn btn-primary" id="placeOrderBtn" type="button" style="min-width:180px;">Place Order</button>
+              <span class="about-note" id="ctaNote"></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ FLEET MAP ============ -->
+      <section class="page" data-page="fleet">
+        <div class="tile-grid">
+          <div class="tile span-8">
+            <div class="tile-head"><span class="tile-title">Live Tracking</span><span class="tile-menu" id="trackOrderLabel"></span></div>
+            <div class="map-wrap" id="trackMapWrap" style="aspect-ratio:16/9;">
+              <canvas id="trackCanvas"></canvas>
+              <div class="map-caption" id="trackCaption">Four Corners Hub</div>
+            </div>
+            <div id="fleetEmpty" class="empty-state">
+              <strong style="color:var(--text-secondary);">No active flights</strong>
+              <span>Place a new delivery to see it tracked here in real time.</span>
+              <button class="btn btn-ghost" style="margin-top:8px;" id="fleetEmptyBtn" type="button">Start a New Delivery</button>
+            </div>
+          </div>
+          <div class="tile span-4">
+            <div class="tile-head"><span class="tile-title">Mission Status</span></div>
+            <ol class="timeline" id="timeline">
+              <li data-stage="confirmed"><span class="t-node">1</span><span>Order confirmed</span><span class="t-time"></span></li>
+              <li data-stage="preparing"><span class="t-node">2</span><span>Preparing at hub</span><span class="t-time"></span></li>
+              <li data-stage="dispatched"><span class="t-node">3</span><span>Drone dispatched</span><span class="t-time"></span></li>
+              <li data-stage="transit"><span class="t-node">4</span><span>In transit</span><span class="t-time"></span></li>
+              <li data-stage="arriving"><span class="t-node">5</span><span>Arriving</span><span class="t-time"></span></li>
+              <li data-stage="delivered"><span class="t-node">6</span><span>Delivered</span><span class="t-time"></span></li>
+            </ol>
+          </div>
+          <div class="tile span-12">
+            <div class="tile-head"><span class="tile-title">Event Log</span></div>
+            <ul class="log-list" id="logList"></ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ ORDERS ============ -->
+      <section class="page" data-page="orders">
+        <div class="tile-grid">
+          <div class="tile span-12">
+            <div class="tile-head"><span class="tile-title">All Orders</span></div>
+            <div class="table-scroll">
+              <table class="data-table">
+                <thead><tr><th>Order</th><th>Placed</th><th>Address</th><th>Package</th><th>Confirm via</th><th>Status</th><th>ETA / Delivered</th><th>Fee</th></tr></thead>
+                <tbody id="ordersBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<!-- ============ DELIVERY CONFIRMATION MODAL ============ -->
+<div class="modal-backdrop" id="confirmModal" hidden>
+  <div class="modal-card">
+    <h2>Confirm Delivery</h2>
+    <p class="lede">Your drone has arrived and is hovering at the drop point.</p>
+
+    <div id="confirmPin" class="confirm-method" hidden>
+      <div class="pin-boxes" id="pinBoxes"><span class="pin-box"></span><span class="pin-box"></span><span class="pin-box"></span><span class="pin-box"></span></div>
+      <div class="keypad" id="keypad"></div>
+    </div>
+
+    <div id="confirmQr" class="confirm-method" hidden>
+      <div class="qr-block"><canvas id="qrCanvas" width="180" height="180"></canvas></div>
+      <button class="btn btn-primary btn-block" id="scanBtn" type="button" style="margin-top:12px;">Simulate Drone Scan</button>
+    </div>
+
+    <div id="confirmPhoto" class="confirm-method" hidden>
+      <img id="photoPreview" alt="Preview of delivered package photo">
+      <label class="btn btn-ghost btn-block" for="photoInput">Take / Upload Photo</label>
+      <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none;">
+      <button class="btn btn-good btn-block" id="confirmPhotoBtn" type="button" disabled style="margin-top:10px;">Confirm Delivery</button>
+    </div>
+
+    <div id="confirmSig" class="confirm-method" hidden>
+      <canvas id="sigCanvas"></canvas>
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button class="btn btn-ghost" id="sigClearBtn" type="button">Clear</button>
+        <button class="btn btn-good" id="confirmSigBtn" type="button" disabled style="flex:1;">Confirm Delivery</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+
+  var C = {
+    accent: '#0f7a9c', accentStrong: '#0b5c78', zone: '#b8447f',
+    good: '#347e46', warning: '#c78f1e', critical: '#b04a34',
+    text: '#8a9587', ink: '#1f2921', grid: 'rgba(31,41,33,0.06)'
+  };
+  var CRUISE_MPH = 30, MAX_LB = 5;
+  var HUB = { fx: 0.12, fy: 0.85 };
+  var HAZARDS = [
+    { fx: 0.72, fy: 0.28, rFrac: 0.16, label: 'Bozeman Yellowstone International Airport (BZN) — Restricted Airspace' },
+    { fx: 0.30, fy: 0.20, rFrac: 0.13, label: 'Gallatin National Forest Boundary — No-Fly Zone (Wilderness Area)' }
+  ];
+  var SAFE_ZONE = { fx: 0.62, fy: 0.68, rFrac: 0.22 };
+  var CATEGORIES = [
+    { id: 'envelope', label: 'Envelope', weight: 0.4, dims: '12×9×1 in' },
+    { id: 'small', label: 'Small Box', weight: 1.5, dims: '12×10×6 in' },
+    { id: 'medium', label: 'Medium Box', weight: 3.8, dims: '18×14×8 in' },
+    { id: 'custom', label: 'Custom', weight: 1.5, dims: 'Enter weight below' }
+  ];
+  var METHODS = [
+    { id: 'pin', name: 'PIN Code', desc: 'A 4-digit code confirms it’s you.', icon: '<path d="M4 10h16v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8z"/><path d="M8 10V7a4 4 0 1 1 8 0v3"/>' },
+    { id: 'qr', name: 'QR Code', desc: 'Show a code to the scanner.', icon: '<rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><path d="M14 14h3v3h-3zM20 14v3M17 20h3"/>' },
+    { id: 'photo', name: 'Photo', desc: 'A photo of the package at your door.', icon: '<rect x="3" y="7" width="18" height="13" rx="2"/><circle cx="12" cy="13.5" r="3.2"/><path d="M8 7l1.5-2.5h5L16 7"/>' },
+    { id: 'sig', name: 'Signature', desc: 'Sign on screen to confirm.', icon: '<path d="M3 18c3-1 4-4 6-4s2 3 4 3 3-4 6-4"/><path d="M4 21h16" stroke-linecap="round"/>' }
+  ];
+
+  var S = {
+    zone: null, addressText: '', category: 'small', weight: 1.5, method: 'pin',
+    windMph: 10, highWindDemo: false, order: null
+  };
+
+  var orders = [
+    mkOrder('4415 Jackson Creek Rd', 'small', 1.4, 'pin', 'delivered', '8:41 AM'),
+    mkOrder('212 Springhill Rd', 'envelope', 0.3, 'qr', 'delivered', '9:15 AM'),
+    mkOrder('8850 Cottonwood Rd', 'medium', 3.9, 'photo', 'delivered', '10:02 AM'),
+    mkOrder('1180 Bridger Canyon Rd', 'small', 1.8, 'sig', 'delivered', '11:20 AM'),
+    mkOrder('60 Bear Canyon Rd', 'small', 2.0, 'pin', 'delayed', '—'),
+    mkOrder('315 Sourdough Canyon Rd', 'envelope', 0.5, 'qr', 'delivered', '1:47 PM')
+  ];
+  var seq = orders.length;
+
+  function mkOrder(addr, catId, weight, method, status, when) {
+    var cat = CATEGORIES.find(function (c) { return c.id === catId; });
+    var m = METHODS.find(function (mm) { return mm.id === method; });
+    return { id: 'WP-' + String(1040 + Math.floor(Math.random() * 900)), address: addr, category: cat, weight: weight, method: m, status: status, when: when, fee: (4.99 + Math.random() * 4).toFixed(2) };
+  }
+
+  function hashStr(str) {
+    var h = 2166136261;
+    for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return Math.abs(h);
+  }
+  function nowStr() { return new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
+
+  /* ============================================================
+     Navigation
+  ============================================================ */
+  var PAGE_META = {
+    overview: { title: 'Delivery Operations', sub: 'Four Corners Hub · Serving ranches and rural routes outside Bozeman, MT', filters: true },
+    new:      { title: 'New Delivery', sub: 'Place an order and run the pre-flight safety checks', filters: false },
+    fleet:    { title: 'Fleet Map', sub: 'Live drone tracking and mission status', filters: false },
+    orders:   { title: 'Orders', sub: 'Full delivery history across the network', filters: false }
+  };
+  function showPage(name) {
+    document.querySelectorAll('.page').forEach(function (p) { p.classList.toggle('is-active', p.dataset.page === name); });
+    document.querySelectorAll('.nav-btn').forEach(function (b) { b.classList.toggle('is-active', b.dataset.page === name); });
+    var meta = PAGE_META[name];
+    $('pageTitle').textContent = meta.title;
+    $('pageSubtitle').textContent = meta.sub;
+    $('topFilterRow').style.visibility = meta.filters ? 'visible' : 'hidden';
+    if (name === 'new') requestAnimationFrame(resizeZoneMap);
+    if (name === 'fleet') requestAnimationFrame(resizeTrackMap);
+    if (name === 'overview') { requestAnimationFrame(resizeOvMap); refreshCharts(); }
+  }
+  document.querySelectorAll('.nav-btn').forEach(function (b) {
+    b.addEventListener('click', function () { showPage(b.dataset.page); });
+  });
+  $('fleetEmptyBtn').addEventListener('click', function () { showPage('new'); });
+
+  /* ============================================================
+     Toasts
+  ============================================================ */
+  function toast(msg, sev) {
+    var t = document.createElement('div');
+    t.className = 'toast sev-' + (sev || 'info');
+    var dot = document.createElement('span'); dot.className = 'dot';
+    var text = document.createElement('span'); text.textContent = msg;
+    t.appendChild(dot); t.appendChild(text);
+    $('toastStack').appendChild(t);
+    while ($('toastStack').children.length > 3) $('toastStack').removeChild($('toastStack').firstChild);
+    setTimeout(function () {
+      t.classList.add('is-leaving');
+      setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 300);
+    }, 2800);
+  }
+  function addLog(msg, sev) {
+    var li = document.createElement('li');
+    li.className = 'sev-' + (sev || 'info');
+    li.innerHTML = '<span class="log-dot"></span><span class="log-time mono">' + nowStr() + '</span><span class="log-msg">' + msg + '</span>';
+    $('logList').insertBefore(li, $('logList').firstChild);
+  }
+
+  /* ============================================================
+     Charts
+  ============================================================ */
+  function setupCanvas(canvas) {
+    var rect = canvas.parentElement.getBoundingClientRect();
+    var dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    var ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx: ctx, w: rect.width, h: rect.height };
+  }
+
+  var HOURS = ['8a','9a','10a','11a','12p','1p','2p','3p','4p','5p','6p'];
+  var HOUR_VOL = [2,3,5,4,6,7,5,8,6,4,3];
+
+  function drawBarChart() {
+    var canvas = $('barChart'); var d = setupCanvas(canvas); var ctx = d.ctx, w = d.w, h = d.h;
+    if (w <= 0 || h <= 0) return; // tile is hidden (e.g. Overview isn't the active page) — nothing to draw yet
+    ctx.clearRect(0, 0, w, h);
+    var padL = 22, padB = 20, padT = 8, padR = 6;
+    var chartW = w - padL - padR, chartH = h - padT - padB;
+    var maxV = Math.max.apply(null, HOUR_VOL) * 1.2;
+    var n = HOUR_VOL.length, gap = 8;
+    var barW = (chartW - gap * (n - 1)) / n;
+
+    ctx.strokeStyle = 'rgba(31,41,33,0.10)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(padL, padT + chartH); ctx.lineTo(padL + chartW, padT + chartH); ctx.stroke();
+
+    HOUR_VOL.forEach(function (v, i) {
+      var bh = (v / maxV) * chartH;
+      var x = padL + i * (barW + gap), y = padT + chartH - bh;
+      var isNow = i === HOUR_VOL.length - 3;
+      ctx.fillStyle = isNow ? C.accentStrong : C.accent;
+      ctx.globalAlpha = isNow ? 1 : 0.72;
+      roundRectTop(ctx, x, y, barW, bh, 3);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = C.text; ctx.font = '9px "IBM Plex Mono", monospace'; ctx.textAlign = 'center';
+      ctx.fillText(HOURS[i], x + barW / 2, padT + chartH + 13);
+    });
+    ctx.textAlign = 'left';
+  }
+  function roundRectTop(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x, y + h);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
+    ctx.lineTo(x + w - r, y);
+    ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.lineTo(x + w, y + h);
+    ctx.closePath();
+  }
+
+  function statusCounts() {
+    var counts = { Delivered: 0, 'In Transit': 0, Preparing: 0, Delayed: 0 };
+    orders.forEach(function (o) {
+      if (o.status === 'delivered') counts.Delivered++;
+      else if (o.status === 'delayed') counts.Delayed++;
+      else if (o.status === 'preparing' || o.status === 'confirmed') counts.Preparing++;
+      else counts['In Transit']++;
+    });
+    return counts;
+  }
+  function drawDonut() {
+    var canvas = $('donutChart'); var d = setupCanvas(canvas); var ctx = d.ctx, w = d.w, h = d.h;
+    if (w <= 0 || h <= 0) return; // tile is hidden (e.g. Overview isn't the active page) — nothing to draw yet
+    ctx.clearRect(0, 0, w, h);
+    var counts = statusCounts();
+    var entries = [
+      ['Delivered', counts.Delivered, C.good],
+      ['In Transit', counts['In Transit'], C.accent],
+      ['Preparing', counts.Preparing, C.text],
+      ['Delayed', counts.Delayed, C.warning]
+    ];
+    var total = entries.reduce(function (s, e) { return s + e[1]; }, 0) || 1;
+    var cx = w / 2, cy = h / 2, r = Math.max(1, Math.min(w, h) / 2 - 8), rIn = r * 0.62;
+    var a0 = -Math.PI / 2;
+    entries.forEach(function (e) {
+      var frac = e[1] / total;
+      var a1 = a0 + frac * Math.PI * 2;
+      if (e[1] > 0) {
+        ctx.beginPath(); ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, r, a0, a1); ctx.closePath();
+        ctx.fillStyle = e[2]; ctx.fill();
+      }
+      a0 = a1;
+    });
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath(); ctx.arc(cx, cy, rIn, 0, Math.PI * 2); ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = C.ink; ctx.font = '700 20px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(String(total), cx, cy - 6);
+    ctx.fillStyle = C.text; ctx.font = '9px IBM Plex Sans, sans-serif';
+    ctx.fillText('ORDERS', cx, cy + 12);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+
+    var legend = $('donutLegend'); legend.innerHTML = '';
+    entries.forEach(function (e) {
+      var span = document.createElement('span');
+      span.innerHTML = '<i style="background:' + e[2] + '"></i>' + e[0] + ' (' + e[1] + ')';
+      legend.appendChild(span);
+    });
+  }
+
+  function windSeries() {
+    var base = [8, 11, 9, 13, 12, S.highWindDemo ? 27 : 10];
+    return base;
+  }
+  function drawWindChart() {
+    var canvas = $('windChart'); var d = setupCanvas(canvas); var ctx = d.ctx, w = d.w, h = d.h;
+    if (w <= 0 || h <= 0) return; // tile is hidden (e.g. Overview isn't the active page) — nothing to draw yet
+    ctx.clearRect(0, 0, w, h);
+    var series = windSeries();
+    var labels = ['-5h','-4h','-3h','-2h','-1h','Now'];
+    var padL = 26, padR = 10, padT = 10, padB = 20;
+    var chartW = w - padL - padR, chartH = h - padT - padB;
+    var maxV = 32, threshold = 20;
+
+    ctx.strokeStyle = 'rgba(31,41,33,0.10)'; ctx.lineWidth = 1;
+    [0, 10, 20, 30].forEach(function (v) {
+      var y = padT + chartH - (v / maxV) * chartH;
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + chartW, y); ctx.stroke();
+      ctx.fillStyle = C.text; ctx.font = '9px "IBM Plex Mono", monospace'; ctx.textAlign = 'right';
+      ctx.fillText(String(v), padL - 5, y + 3);
+    });
+    ctx.textAlign = 'left';
+
+    var ty = padT + chartH - (threshold / maxV) * chartH;
+    ctx.setLineDash([4, 4]); ctx.strokeStyle = C.critical; ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.moveTo(padL, ty); ctx.lineTo(padL + chartW, ty); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = C.critical; ctx.font = '9px IBM Plex Sans, sans-serif';
+    ctx.fillText('20 mph safe-flight limit', padL + 4, ty - 4);
+
+    var pts = series.map(function (v, i) {
+      return { x: padL + (i / (series.length - 1)) * chartW, y: padT + chartH - (v / maxV) * chartH };
+    });
+    var grad = ctx.createLinearGradient(0, padT, 0, padT + chartH);
+    grad.addColorStop(0, 'rgba(15,122,156,0.28)'); grad.addColorStop(1, 'rgba(15,122,156,0.02)');
+    ctx.beginPath(); ctx.moveTo(pts[0].x, padT + chartH);
+    pts.forEach(function (p) { ctx.lineTo(p.x, p.y); });
+    ctx.lineTo(pts[pts.length - 1].x, padT + chartH); ctx.closePath();
+    ctx.fillStyle = grad; ctx.fill();
+
+    ctx.beginPath(); ctx.strokeStyle = C.accent; ctx.lineWidth = 2.2; ctx.lineJoin = 'round';
+    pts.forEach(function (p, i) { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+    ctx.stroke();
+
+    pts.forEach(function (p, i) {
+      var last = i === pts.length - 1;
+      ctx.beginPath(); ctx.arc(p.x, p.y, last ? 4 : 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = last && series[i] > threshold ? C.critical : C.accent; ctx.fill();
+      if (last) {
+        ctx.fillStyle = C.ink; ctx.font = '700 10px "IBM Plex Mono", monospace'; ctx.textAlign = 'center';
+        ctx.fillText(series[i] + ' mph', p.x, p.y - 9);
+        ctx.textAlign = 'left';
+      }
+    });
+
+    ctx.fillStyle = C.text; ctx.font = '9px "IBM Plex Mono", monospace'; ctx.textAlign = 'center';
+    labels.forEach(function (l, i) { ctx.fillText(l, pts[i].x, padT + chartH + 13); });
+    ctx.textAlign = 'left';
+  }
+
+  function refreshCharts() { drawBarChart(); drawDonut(); drawWindChart(); }
+  window.addEventListener('resize', function () {
+    if (document.querySelector('.page[data-page="overview"]').classList.contains('is-active')) refreshCharts();
+  });
+
+  /* ============================================================
+     Overview / Orders tables
+  ============================================================ */
+  function statusLabel(st) {
+    return { delivered: 'Delivered', delayed: 'Delayed', preparing: 'Preparing', confirmed: 'Confirmed', dispatched: 'Dispatched', transit: 'In Transit', arriving: 'Arriving' }[st] || st;
+  }
+  function renderOrderRow(o, withPlaced) {
+    var tr = document.createElement('tr');
+    var etaCell = o.status === 'delivered' ? o.when : (o.status === 'delayed' ? '—' : (S.order && S.order.id === o.id ? '~' + S.order.etaMin + ' min' : o.when));
+    tr.innerHTML =
+      '<td class="mono">' + o.id + '</td>' +
+      (withPlaced ? '<td class="mono">' + o.when + '</td>' : '') +
+      '<td>' + o.address + '</td>' +
+      '<td>' + o.category.label + ' · ' + o.weight.toFixed(1) + ' lb</td>' +
+      '<td>' + o.method.name + '</td>' +
+      '<td><span class="status-pill st-' + o.status + '">' + statusLabel(o.status) + '</span></td>' +
+      '<td class="mono">' + etaCell + '</td>' +
+      (withPlaced ? '<td class="mono">$' + o.fee + '</td>' : '');
+    return tr;
+  }
+  function renderTables() {
+    var ovBody = $('overviewOrdersBody'); ovBody.innerHTML = '';
+    orders.slice(0, 6).forEach(function (o) { ovBody.appendChild(renderOrderRow(o, false)); });
+    var allBody = $('ordersBody'); allBody.innerHTML = '';
+    orders.forEach(function (o) { allBody.appendChild(renderOrderRow(o, true)); });
+    $('kpiToday').textContent = String(orders.length);
+  }
+  function refreshKpis() {
+    var active = orders.filter(function (o) { return ['confirmed','preparing','dispatched','transit','arriving'].indexOf(o.status) !== -1; });
+    $('kpiActive').textContent = String(active.length);
+    $('kpiActiveDelta').textContent = active.length ? (active.length + ' drone' + (active.length > 1 ? 's' : '') + ' airborne') : 'No drones airborne';
+    $('kpiActiveDelta').className = 'kpi-delta ' + (active.length ? 'is-good' : 'is-flat');
+  }
+
+  /* ============================================================
+     New Delivery — drop zone map
+  ============================================================ */
+  var zoneCanvas = $('mapCanvas'), zoneCtx = zoneCanvas.getContext('2d'), mapWrap = $('mapWrap');
+  var zoneMapSize = { w: 0, h: 0 };
+  var SAMPLE_ADDRESSES = ['4415 Jackson Creek Rd', '212 Springhill Rd', '8850 Cottonwood Rd'];
+
+  function buildAddressChips() {
+    var wrap = $('addressChips'); wrap.innerHTML = '';
+    SAMPLE_ADDRESSES.forEach(function (addr) {
+      var c = document.createElement('button'); c.type = 'button'; c.className = 'chip'; c.textContent = addr;
+      c.addEventListener('click', function () { $('addressInput').value = addr; applyAddress(addr); });
+      wrap.appendChild(c);
+    });
+  }
+  function syncAddressField() {
+    Array.prototype.forEach.call($('addressChips').children, function (c) { c.classList.toggle('is-selected', c.textContent === S.addressText); });
+  }
+  function applyAddress(addr) {
+    S.addressText = addr; syncAddressField();
+    $('addressField').classList.remove('has-error');
+    var h = hashStr(addr);
+    var angle = (h % 360) * Math.PI / 180;
+    var rFrac = SAFE_ZONE.rFrac * 0.5 * ((h % 100) / 100);
+    var fx = SAFE_ZONE.fx + Math.cos(angle) * rFrac;
+    var fy = SAFE_ZONE.fy + Math.sin(angle) * rFrac * 0.7;
+    trySetZone(fx, fy);
+  }
+  $('addressInput').addEventListener('change', function () { var v = this.value.trim(); if (v) applyAddress(v); });
+
+  function resizeZoneMap() {
+    var rect = mapWrap.getBoundingClientRect();
+    var dpr = window.devicePixelRatio || 1;
+    zoneCanvas.width = Math.round(rect.width * dpr); zoneCanvas.height = Math.round(rect.height * dpr);
+    zoneCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    zoneMapSize.w = rect.width; zoneMapSize.h = rect.height;
+    drawZoneMap();
+  }
+  window.addEventListener('resize', resizeZoneMap);
+  function toPxZ(fx, fy) { return { x: fx * zoneMapSize.w, y: fy * zoneMapSize.h }; }
+  function minDimZ() { return Math.min(zoneMapSize.w, zoneMapSize.h); }
+  function pointInCircle(fx, fy, c) {
+    var p = toPxZ(fx, fy), cc = toPxZ(c.fx, c.fy), r = c.rFrac * minDimZ();
+    return Math.hypot(p.x - cc.x, p.y - cc.y) <= r;
+  }
+  function drawZoneMap() {
+    var w = zoneMapSize.w, h = zoneMapSize.h;
+    zoneCtx.clearRect(0, 0, w, h);
+    zoneCtx.strokeStyle = C.grid; zoneCtx.lineWidth = 1;
+    var step = 28;
+    for (var x = 0; x < w; x += step) { zoneCtx.beginPath(); zoneCtx.moveTo(x, 0); zoneCtx.lineTo(x, h); zoneCtx.stroke(); }
+    for (var y = 0; y < h; y += step) { zoneCtx.beginPath(); zoneCtx.moveTo(0, y); zoneCtx.lineTo(w, y); zoneCtx.stroke(); }
+
+    var sp = toPxZ(SAFE_ZONE.fx, SAFE_ZONE.fy), sr = SAFE_ZONE.rFrac * minDimZ();
+    zoneCtx.beginPath(); zoneCtx.setLineDash([5, 5]);
+    zoneCtx.fillStyle = 'rgba(52,126,70,0.10)'; zoneCtx.strokeStyle = 'rgba(52,126,70,0.55)'; zoneCtx.lineWidth = 1.5;
+    zoneCtx.arc(sp.x, sp.y, sr, 0, Math.PI * 2); zoneCtx.fill(); zoneCtx.stroke(); zoneCtx.setLineDash([]);
+
+    HAZARDS.forEach(function (hz) {
+      var p = toPxZ(hz.fx, hz.fy), r = hz.rFrac * minDimZ();
+      zoneCtx.beginPath(); zoneCtx.fillStyle = 'rgba(184,68,127,0.12)'; zoneCtx.strokeStyle = 'rgba(184,68,127,0.55)'; zoneCtx.lineWidth = 1.5;
+      zoneCtx.setLineDash([2, 4]); zoneCtx.arc(p.x, p.y, r, 0, Math.PI * 2); zoneCtx.fill(); zoneCtx.stroke(); zoneCtx.setLineDash([]);
+    });
+
+    var hb = toPxZ(HUB.fx, HUB.fy);
+    zoneCtx.fillStyle = C.ink;
+    zoneCtx.beginPath(); zoneCtx.moveTo(hb.x, hb.y - 6); zoneCtx.lineTo(hb.x + 6, hb.y); zoneCtx.lineTo(hb.x, hb.y + 6); zoneCtx.lineTo(hb.x - 6, hb.y); zoneCtx.closePath(); zoneCtx.fill();
+
+    if (S.zone) {
+      var zp = toPxZ(S.zone.fx, S.zone.fy);
+      var pulse = 5 + 3 * (0.5 + 0.5 * Math.sin(performance.now() / 420));
+      zoneCtx.beginPath(); zoneCtx.arc(zp.x, zp.y, pulse + 5, 0, Math.PI * 2);
+      zoneCtx.strokeStyle = 'rgba(15,122,156,0.5)'; zoneCtx.lineWidth = 1.5; zoneCtx.stroke();
+      zoneCtx.beginPath(); zoneCtx.arc(zp.x, zp.y, 5, 0, Math.PI * 2);
+      zoneCtx.fillStyle = C.accent; zoneCtx.fill();
+      requestAnimationFrame(drawZoneMap);
+    }
+  }
+  function trySetZone(fx, fy) {
+    fx = Math.max(0.05, Math.min(0.95, fx)); fy = Math.max(0.05, Math.min(0.95, fy));
+    var hit = HAZARDS.find(function (hz) { return pointInCircle(fx, fy, hz); });
+    if (hit) {
+      $('zoneError').style.display = 'flex';
+      $('zoneErrorTitle').textContent = 'That point is inside a no-fly zone';
+      $('zoneErrorDetail').textContent = hit.label + '. Choose a spot inside the highlighted safe area instead.';
+      toast('Point is inside a no-fly zone', 'critical');
+      return;
+    }
+    $('zoneError').style.display = 'none';
+    S.zone = { fx: fx, fy: fy };
+    $('mapCaption').textContent = 'Drop point set · geofence 0.1 mi radius';
+    drawZoneMap();
+  }
+  mapWrap.addEventListener('click', function (evt) {
+    var rect = mapWrap.getBoundingClientRect();
+    trySetZone((evt.clientX - rect.left) / rect.width, (evt.clientY - rect.top) / rect.height);
+  });
+
+  /* Package */
+  function buildCategoryChips() {
+    var wrap = $('categoryChips'); wrap.innerHTML = '';
+    CATEGORIES.forEach(function (cat) {
+      var c = document.createElement('button'); c.type = 'button'; c.className = 'chip'; c.textContent = cat.label + ' · ' + cat.dims;
+      c.addEventListener('click', function () {
+        S.category = cat.id;
+        if (cat.id !== 'custom') { S.weight = cat.weight; $('weightInput').value = cat.weight; }
+        syncCategoryChips(); refreshPackageMeter();
+      });
+      wrap.appendChild(c);
+    });
+    syncCategoryChips();
+  }
+  function syncCategoryChips() {
+    Array.prototype.forEach.call($('categoryChips').children, function (c, i) { c.classList.toggle('is-selected', CATEGORIES[i].id === S.category); });
+  }
+  $('weightInput').addEventListener('input', function () { S.weight = parseFloat(this.value) || 0; refreshPackageMeter(); });
+  function refreshPackageMeter() {
+    var pct = Math.min(160, Math.round((S.weight / MAX_LB) * 100));
+    $('limitPct').textContent = pct + '%';
+    var fill = $('limitFill'); fill.style.width = Math.min(100, pct) + '%';
+    fill.classList.toggle('is-warning', pct >= 80 && pct <= 100);
+    fill.classList.toggle('is-critical', pct > 100);
+    $('weightError').style.display = S.weight > MAX_LB ? 'flex' : 'none';
+  }
+
+  function buildMethodGrid() {
+    var wrap = $('methodGrid'); wrap.innerHTML = '';
+    METHODS.forEach(function (m) {
+      var c = document.createElement('button'); c.type = 'button'; c.className = 'method-card';
+      c.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">' + m.icon + '</svg><span class="m-name">' + m.name + '</span><span class="m-desc">' + m.desc + '</span>';
+      c.addEventListener('click', function () { S.method = m.id; syncMethodGrid(); });
+      wrap.appendChild(c);
+    });
+    syncMethodGrid();
+  }
+  function syncMethodGrid() {
+    Array.prototype.forEach.call($('methodGrid').children, function (c, i) { c.classList.toggle('is-selected', METHODS[i].id === S.method); });
+  }
+
+  /* Review */
+  function distanceMiles() {
+    if (!S.zone) return 0;
+    var dx = (S.zone.fx - HUB.fx), dy = (S.zone.fy - HUB.fy);
+    return Math.hypot(dx, dy) * 6.5; // rural Gallatin County properties sit miles apart, not blocks
+  }
+  function refreshReview() {
+    var cat = CATEGORIES.find(function (c) { return c.id === S.category; });
+    var method = METHODS.find(function (m) { return m.id === S.method; });
+    var dist = distanceMiles();
+    var etaMin = Math.max(4, Math.round((dist / CRUISE_MPH) * 60 + 4));
+    var fee = (4.99 + dist * 1.2).toFixed(2);
+    $('sumAddress').textContent = S.addressText || '—';
+    $('sumPackage').textContent = cat.label + ' · ' + S.weight.toFixed(1) + ' lb';
+    $('sumMethod').textContent = method.name;
+    $('sumDistance').textContent = S.zone ? dist.toFixed(2) + ' mi' : '—';
+    $('sumEta').textContent = S.zone ? '~' + etaMin + ' min' : '—';
+    $('sumFee').textContent = S.zone ? '$' + fee : '—';
+
+    S.windMph = S.highWindDemo ? 27 : 10;
+    var windOk = S.windMph <= 20;
+    $('fcWeather').classList.toggle('is-blocked', !windOk);
+    $('fcWeatherLabel').textContent = windOk ? ('Wind ' + S.windMph + ' mph — within limits') : ('Wind ' + S.windMph + ' mph — exceeds safe threshold');
+    $('windBanner').style.display = windOk ? 'none' : 'flex';
+
+    var blocked = !windOk || S.weight > MAX_LB || !S.zone;
+    $('placeOrderBtn').disabled = blocked;
+    var note = $('ctaNote'); note.textContent = '';
+    if (!S.zone) note.textContent = 'Set a drop point above to continue.';
+    else if (!windOk) note.textContent = 'Launch is on hold until wind conditions clear.';
+    else if (S.weight > MAX_LB) note.textContent = 'Reduce package weight to place this order.';
+    return { cat: cat, method: method, dist: dist, etaMin: etaMin, fee: fee };
+  }
+  $('windToggle').addEventListener('change', function () { S.highWindDemo = this.checked; refreshReview(); refreshCharts(); });
+  ['addressInput'].forEach(function () {});
+  var reviewInputs = [$('weightInput')];
+  reviewInputs.forEach(function (el) { el.addEventListener('input', refreshReview); });
+  document.getElementById('categoryChips').addEventListener('click', refreshReview);
+  document.getElementById('methodGrid').addEventListener('click', refreshReview);
+  mapWrap.addEventListener('click', function () { setTimeout(refreshReview, 0); });
+  $('addressInput').addEventListener('change', function () { setTimeout(refreshReview, 0); });
+
+  $('placeOrderBtn').addEventListener('click', function () {
+    var r = refreshReview();
+    if ($('placeOrderBtn').disabled) return;
+    seq++;
+    var order = {
+      id: 'WP-' + (2000 + seq), address: S.addressText, category: r.cat, weight: S.weight, method: r.method,
+      status: 'confirmed', when: nowStr(), fee: r.fee, dist: r.dist, etaMin: r.etaMin, zone: S.zone
+    };
+    S.order = order;
+    orders.unshift(order);
+    renderTables(); refreshKpis(); refreshCharts();
+    toast('Order ' + order.id + ' confirmed', 'success');
+    showPage('fleet');
+    startTrackingFlow(order);
+  });
+
+  /* ============================================================
+     Fleet map / tracking
+  ============================================================ */
+  var trackCanvas = $('trackCanvas'), trackCtx = trackCanvas.getContext('2d'), trackWrap = $('trackMapWrap');
+  var trackSize = { w: 0, h: 0 };
+  var ovCanvas = $('ovMapCanvas'), ovCtx = ovCanvas.getContext('2d'), ovWrap = $('ovMapWrap');
+  var ovSize = { w: 0, h: 0 };
+  var T = { active: false, phase: 'idle', drone: { fx: HUB.fx, fy: HUB.fy }, heading: 0, trail: [], startTs: 0, durationS: 0, from: null, stageAt: null };
+  var STAGES = ['confirmed', 'preparing', 'dispatched', 'transit', 'arriving', 'delivered'];
+  var orderPin = '';
+
+  function resizeTrackMap() {
+    var rect = trackWrap.getBoundingClientRect(); var dpr = window.devicePixelRatio || 1;
+    trackCanvas.width = Math.round(rect.width * dpr); trackCanvas.height = Math.round(rect.height * dpr);
+    trackCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    trackSize.w = rect.width; trackSize.h = rect.height;
+  }
+  function resizeOvMap() {
+    var rect = ovWrap.getBoundingClientRect(); var dpr = window.devicePixelRatio || 1;
+    ovCanvas.width = Math.round(rect.width * dpr); ovCanvas.height = Math.round(rect.height * dpr);
+    ovCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ovSize.w = rect.width; ovSize.h = rect.height;
+  }
+  window.addEventListener('resize', function () { resizeTrackMap(); resizeOvMap(); });
+
+  function drawMiniMap(ctx, size) {
+    var w = size.w, h = size.h; if (!w) return;
+    ctx.clearRect(0, 0, w, h);
+    ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
+    var step = 26;
+    for (var x = 0; x < w; x += step) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+    for (var y = 0; y < h; y += step) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+
+    function toPx(pos) { return { x: pos.fx * w, y: pos.fy * h }; }
+    var hub = toPx(HUB);
+    ctx.fillStyle = C.ink;
+    ctx.beginPath(); ctx.moveTo(hub.x, hub.y - 6); ctx.lineTo(hub.x + 6, hub.y); ctx.lineTo(hub.x, hub.y + 6); ctx.lineTo(hub.x - 6, hub.y); ctx.closePath(); ctx.fill();
+
+    if (T.active && S.order && S.order.zone) {
+      var zone = toPx(S.order.zone);
+      var cp = { x: (hub.x + zone.x) / 2 - (zone.y - hub.y) * 0.2, y: (hub.y + zone.y) / 2 + (zone.x - hub.x) * 0.2 };
+      ctx.beginPath(); ctx.setLineDash([2, 6]); ctx.strokeStyle = 'rgba(184,68,127,0.4)'; ctx.lineWidth = 1.4;
+      ctx.moveTo(hub.x, hub.y); ctx.quadraticCurveTo(cp.x, cp.y, zone.x, zone.y); ctx.stroke(); ctx.setLineDash([]);
+
+      if (T.trail.length > 1) {
+        ctx.beginPath(); ctx.strokeStyle = 'rgba(15,122,156,0.5)'; ctx.lineWidth = 2;
+        ctx.moveTo(T.trail[0].x * w, T.trail[0].y * h);
+        for (var i = 1; i < T.trail.length; i++) ctx.lineTo(T.trail[i].x * w, T.trail[i].y * h);
+        ctx.stroke();
+      }
+      ctx.beginPath(); ctx.arc(zone.x, zone.y, 5, 0, Math.PI * 2); ctx.fillStyle = C.accent; ctx.fill();
+      ctx.fillStyle = C.text; ctx.font = '600 9px IBM Plex Sans, sans-serif'; ctx.fillText('YOU', zone.x + 9, zone.y - 8);
+
+      var dp = toPx(T.drone);
+      var glow = ctx.createRadialGradient(dp.x, dp.y, 0, dp.x, dp.y, 14);
+      glow.addColorStop(0, 'rgba(11,92,120,0.30)'); glow.addColorStop(1, 'rgba(11,92,120,0)');
+      ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(dp.x, dp.y, 14, 0, Math.PI * 2); ctx.fill();
+      ctx.save(); ctx.translate(dp.x, dp.y); ctx.rotate(T.heading + Math.PI / 2);
+      ctx.beginPath(); ctx.moveTo(0, -7); ctx.lineTo(5, 6); ctx.lineTo(0, 3); ctx.lineTo(-5, 6); ctx.closePath();
+      ctx.fillStyle = C.accentStrong; ctx.fill(); ctx.restore();
+    }
+    ctx.fillStyle = C.text; ctx.font = '600 9px IBM Plex Sans, sans-serif'; ctx.fillText('HUB', hub.x + 9, hub.y + 4);
+  }
+
+  function controlPointT(a, b, size) {
+    var p = { x: a.fx * size.w, y: a.fy * size.h }, q = { x: b.fx * size.w, y: b.fy * size.h };
+    var mx = (p.x + q.x) / 2, my = (p.y + q.y) / 2, dx = q.x - p.x, dy = q.y - p.y, len = Math.hypot(dx, dy) || 1;
+    var nx = -dy / len, ny = dx / len, bow = Math.min(len * 0.2, 50);
+    return { x: mx + nx * bow, y: my + ny * bow };
+  }
+  function bezierT(a, b, t, size) {
+    var p0 = { x: a.fx * size.w, y: a.fy * size.h }, p2 = { x: b.fx * size.w, y: b.fy * size.h }, p1 = controlPointT(a, b, size);
+    var x = (1 - t) * (1 - t) * p0.x + 2 * (1 - t) * t * p1.x + t * t * p2.x;
+    var y = (1 - t) * (1 - t) * p0.y + 2 * (1 - t) * t * p1.y + t * t * p2.y;
+    var dx = 2 * (1 - t) * (p1.x - p0.x) + 2 * t * (p2.x - p1.x), dy = 2 * (1 - t) * (p1.y - p0.y) + 2 * t * (p2.y - p1.y);
+    return { fx: x / size.w, fy: y / size.h, heading: Math.atan2(dy, dx) };
+  }
+  function easeInOut(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+
+  function setStageTimeline(stage) {
+    var idx = STAGES.indexOf(stage);
+    Array.prototype.forEach.call($('timeline').children, function (li, i) {
+      li.classList.remove('is-active', 'is-complete');
+      var timeEl = li.querySelector('.t-time');
+      if (i < idx) { li.classList.add('is-complete'); if (!timeEl.textContent) timeEl.textContent = nowStr(); }
+      else if (i === idx) { li.classList.add('is-active'); timeEl.textContent = nowStr(); }
+    });
+  }
+  function updateOrderStatus(order, status) {
+    order.status = status === 'confirmed' ? 'confirmed' : status;
+    renderTables(); refreshKpis(); refreshCharts();
+  }
+
+  function startTrackingFlow(order) {
+    $('fleetEmpty').style.display = 'none';
+    $('trackOrderLabel').textContent = order.id;
+    $('trackCaption').textContent = 'Four Corners Hub → ' + order.address;
+    $('ovMapCaption').textContent = order.id + ' → ' + order.address;
+    T.active = true; T.drone = { fx: HUB.fx, fy: HUB.fy }; T.trail = []; T.stageAt = null;
+    resizeTrackMap(); resizeOvMap();
+    setStageTimeline('confirmed');
+    $('logList').innerHTML = '';
+    addLog('Order ' + order.id + ' confirmed for ' + order.address, 'info');
+
+    setTimeout(function () {
+      updateOrderStatus(order, 'preparing'); setStageTimeline('preparing');
+      addLog('Preparing package at Four Corners Hub', 'info'); toast('Preparing your package', 'info');
+    }, 1000);
+    setTimeout(function () { beginFlight(order); }, 2400);
+  }
+
+  function beginFlight(order) {
+    updateOrderStatus(order, 'dispatched'); setStageTimeline('dispatched');
+    addLog('Drone airborne — climbing to 120 ft AGL', 'info'); toast('Drone dispatched — on its way', 'success');
+    T.from = { fx: HUB.fx, fy: HUB.fy };
+    T.durationS = Math.min(38, 14 + order.dist * 2.2); // playback time-compressed for a live demo; ETA/ distance shown stay at real cruise speed
+    T.startTs = performance.now(); T.phase = 'flying';
+    if (order.method.id === 'pin') { orderPin = String(1000 + Math.floor(Math.random() * 9000)); addLog('Delivery PIN generated: ' + orderPin, 'notice'); }
+  }
+
+  function trackTick(now) {
+    if (T.active && T.phase === 'flying' && S.order) {
+      var order = S.order;
+      var t = Math.min(1, (now - T.startTs) / (T.durationS * 1000));
+      var pt = bezierT(T.from, order.zone, easeInOut(t), trackSize.w ? trackSize : { w: 1, h: 1 });
+      T.drone = { fx: pt.fx, fy: pt.fy }; T.heading = pt.heading;
+      T.trail.push({ x: T.drone.fx, y: T.drone.fy });
+      if (T.trail.length > 60) T.trail.shift();
+
+      if (t >= 0.2 && T.stageAt !== 'transit') { T.stageAt = 'transit'; updateOrderStatus(order, 'transit'); setStageTimeline('transit'); }
+      if (t >= 0.85 && T.stageAt !== 'arriving') {
+        T.stageAt = 'arriving'; updateOrderStatus(order, 'arriving'); setStageTimeline('arriving');
+        addLog('Drone is almost there', 'info'); toast('Your drone is almost there', 'info');
+      }
+      if (t >= 1) {
+        T.phase = 'arrived';
+        addLog('Drone arrived at drop point — hovering', 'notice'); toast('Drone has arrived', 'success');
+        setTimeout(function () { openConfirmModal(order); }, 800);
+      }
+    }
+    drawMiniMap(trackCtx, trackSize);
+    drawMiniMap(ovCtx, ovSize);
+    requestAnimationFrame(trackTick);
+  }
+  requestAnimationFrame(trackTick);
+
+  /* ============================================================
+     Delivery confirmation modal
+  ============================================================ */
+  var pinEntry = '';
+  function buildKeypad() {
+    var wrap = $('keypad'); wrap.innerHTML = '';
+    ['1','2','3','4','5','6','7','8','9','⌫','0','✓'].forEach(function (k) {
+      var b = document.createElement('button'); b.type = 'button'; b.textContent = k;
+      b.addEventListener('click', function () { handleKey(k); });
+      wrap.appendChild(b);
+    });
+  }
+  function handleKey(k) {
+    if (k === '⌫') pinEntry = pinEntry.slice(0, -1);
+    else if (k === '✓') { checkPin(); return; }
+    else if (pinEntry.length < 4) pinEntry += k;
+    renderPinBoxes(false);
+  }
+  function renderPinBoxes(error) {
+    Array.prototype.forEach.call($('pinBoxes').children, function (box, i) {
+      box.textContent = pinEntry[i] ? '•' : '';
+      box.classList.toggle('is-filled', !!pinEntry[i]); box.classList.toggle('is-error', !!error);
+    });
+  }
+  function checkPin() {
+    if (pinEntry.length !== 4) { toast('Enter all 4 digits', 'warning'); return; }
+    if (pinEntry === orderPin) completeDelivery();
+    else { renderPinBoxes(true); toast('That PIN doesn’t match — try again', 'critical'); pinEntry = ''; setTimeout(function () { renderPinBoxes(false); }, 500); }
+  }
+  function drawQr(seedStr) {
+    var c = $('qrCanvas'), ctx = c.getContext('2d');
+    var n = 21, cell = c.width / n;
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.fillStyle = '#1f2921';
+    var h = hashStr(seedStr + orderPin + (S.order ? S.order.id : ''));
+    function bit(i) { h = (h * 1103515245 + 12345) & 0x7fffffff; return (h >> (i % 24)) & 1; }
+    var i = 0;
+    for (var r = 0; r < n; r++) for (var cIdx = 0; cIdx < n; cIdx++) {
+      var inFinder = (r < 6 && cIdx < 6) || (r < 6 && cIdx > n - 7) || (r > n - 7 && cIdx < 6);
+      if (inFinder) continue;
+      if (bit(i++)) ctx.fillRect(cIdx * cell, r * cell, cell, cell);
+    }
+    [[0,0],[0,n-7],[n-7,0]].forEach(function (p) {
+      var x = p[1]*cell, y = p[0]*cell, s = 7*cell;
+      ctx.fillStyle = '#1f2921'; ctx.fillRect(x, y, s, s);
+      ctx.fillStyle = '#fff'; ctx.fillRect(x+cell, y+cell, s-2*cell, s-2*cell);
+      ctx.fillStyle = '#1f2921'; ctx.fillRect(x+2*cell, y+2*cell, s-4*cell, s-4*cell);
+    });
+  }
+  var sigCanvas = $('sigCanvas'), sigCtx = null, sigDrawing = false;
+  function initSig() {
+    var rect = sigCanvas.getBoundingClientRect(); var dpr = window.devicePixelRatio || 1;
+    sigCanvas.width = rect.width * dpr; sigCanvas.height = rect.height * dpr;
+    sigCtx = sigCanvas.getContext('2d'); sigCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    sigCtx.strokeStyle = C.ink; sigCtx.lineWidth = 2.2; sigCtx.lineCap = 'round'; sigCtx.lineJoin = 'round';
+    $('confirmSigBtn').disabled = true;
+  }
+  function sigPos(evt) { var rect = sigCanvas.getBoundingClientRect(); var p = evt.touches ? evt.touches[0] : evt; return { x: p.clientX - rect.left, y: p.clientY - rect.top }; }
+  sigCanvas.addEventListener('pointerdown', function (evt) { sigDrawing = true; $('confirmSigBtn').disabled = false; var p = sigPos(evt); sigCtx.beginPath(); sigCtx.moveTo(p.x, p.y); });
+  sigCanvas.addEventListener('pointermove', function (evt) { if (!sigDrawing) return; var p = sigPos(evt); sigCtx.lineTo(p.x, p.y); sigCtx.stroke(); });
+  ['pointerup','pointerleave'].forEach(function (ev) { sigCanvas.addEventListener(ev, function () { sigDrawing = false; }); });
+  $('sigClearBtn').addEventListener('click', function () { sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height); $('confirmSigBtn').disabled = true; });
+  $('photoInput').addEventListener('change', function () {
+    var file = this.files && this.files[0]; if (!file) return;
+    var url = URL.createObjectURL(file); var img = $('photoPreview'); img.src = url; img.style.display = 'block';
+    $('confirmPhotoBtn').disabled = false;
+  });
+  $('confirmPhotoBtn').addEventListener('click', completeDelivery);
+  $('confirmSigBtn').addEventListener('click', completeDelivery);
+  $('scanBtn').addEventListener('click', function () { this.disabled = true; this.textContent = 'Scanning…'; setTimeout(completeDelivery, 1100); });
+
+  function openConfirmModal(order) {
+    $('confirmModal').hidden = false;
+    ['confirmPin','confirmQr','confirmPhoto','confirmSig'].forEach(function (id) { $(id).hidden = true; });
+    if (order.method.id === 'pin') { $('confirmPin').hidden = false; pinEntry = ''; renderPinBoxes(false); }
+    else if (order.method.id === 'qr') { $('confirmQr').hidden = false; drawQr(order.address); $('scanBtn').disabled = false; $('scanBtn').textContent = 'Simulate Drone Scan'; }
+    else if (order.method.id === 'photo') { $('confirmPhoto').hidden = false; $('photoPreview').style.display = 'none'; $('photoPreview').src=''; $('confirmPhotoBtn').disabled = true; $('photoInput').value=''; }
+    else if (order.method.id === 'sig') { $('confirmSig').hidden = false; requestAnimationFrame(initSig); }
+  }
+  function completeDelivery() {
+    var order = S.order;
+    order.status = 'delivered'; order.when = nowStr();
+    setStageTimeline('delivered');
+    addLog('Delivery confirmed via ' + order.method.name + ' — mission complete', 'success');
+    toast('Delivery confirmed', 'success');
+    $('confirmModal').hidden = true;
+    T.active = false; T.phase = 'idle';
+    $('ovMapCaption').textContent = 'No active flights';
+    renderTables(); refreshKpis(); refreshCharts();
+  }
+
+  /* ============================================================
+     Init
+  ============================================================ */
+  buildAddressChips(); buildCategoryChips(); buildMethodGrid(); buildKeypad();
+  renderTables(); refreshKpis(); refreshPackageMeter(); refreshReview();
+  showPage('overview');
+  resizeZoneMap(); resizeTrackMap(); resizeOvMap();
+  refreshCharts();
+})();
+</script>
+</body>
+</html>

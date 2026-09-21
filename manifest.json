@@ -1,0 +1,16 @@
+{
+  "name": "Waypoint — Drone Delivery",
+  "short_name": "Waypoint",
+  "description": "A human-factors prototype for an autonomous drone delivery operation serving rural properties outside Bozeman, Montana, from order placement to delivery confirmation.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#eef0e8",
+  "theme_color": "#eef0e8",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
