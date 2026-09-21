@@ -1,4 +1,4 @@
-# Waypoint — Drone Delivery Prototype
+# - Drone Delivery Prototype
 
 A working front-end prototype of an autonomous drone delivery app, built for a human factors
 engineering course. It demonstrates the full customer journey — **order placement → address &
